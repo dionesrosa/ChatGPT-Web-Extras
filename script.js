@@ -39,40 +39,54 @@
 
         setTimeout(() => {
             abrirMenuUltimaMensagem();
-        }, 300);
+        }, 400);
     }
 
     // Função para abrir o menu da última mensagem
     function abrirMenuUltimaMensagem() {
-        const botoes = document.querySelectorAll('button[aria-label="Mais ações"]');
-        const ultimo = botoes[botoes.length - 1];
+        const btnUltimo = document.querySelectorAll('button[aria-label="Mais ações"]')
+            .item(document.querySelectorAll('button[aria-label="Mais ações"]').length - 1);
 
-        if (!ultimo) {
+        if (!btnUltimo) {
             statusLeitura = false;
             return;
         }
 
-        ultimo.click();
+        btnUltimo?.click();
 
-        setTimeout(clicarLeitura, 300);
+        setTimeout(() => {
+            clicarLeitura(btnUltimo);
+        }, 400);
     }
 
     // Função para clicar no botão de leitura da mensagem
-    function clicarLeitura() {
-        const btn = document.querySelector('[data-testid="voice-play-turn-action-button"]');
-
+    function clicarLeitura(btn) {
         if (!btn) {
             statusLeitura = false;
+            console.log('Botão de leitura não encontrado. Verifique se a funcionalidade de leitura está disponível para esta mensagem.');
             return;
         }
 
-        if (btn.textContent?.includes("Parar")) {
-            btn.click();
-            setTimeout(clicarLeitura, 300);
+        console.log('Botão de leitura encontrado. Iniciando leitura...');
+        let btnPlay = document.querySelector(
+            '[data-testid="voice-play-turn-action-button"]'
+        );
+
+        if (btnPlay.textContent?.includes("Parar")) {
+            btnPlay?.click();
+            console.log('Parando a leitura atual. Tentando iniciar novamente...');
+
+            setTimeout(clicarLeitura, 400);
             return;
         }
 
-        btn.click();
+        btnPlay?.click();
+        console.log('Iniciando a leitura da última mensagem.');
+
+        setTimeout(() => {
+            document.querySelector('#prompt-textarea')?.focus();
+        }, 500);
+
         statusLeitura = false;
     }
 
@@ -83,18 +97,22 @@
             return;
         }
 
-        listenerGeracao = setInterval(() => {
-            const stopBtn = [...document.querySelectorAll("button")].find(btn => btn.textContent?.includes("Parar geração"));
+        let ultimoEstado = null;
 
-            if (stopBtn) {
-                statusGerando = true;
-                console.log('Resposta em geração detectada. Aguardando finalização...');
-            } else {
-                if (statusGerando) {
-                    statusGerando = false;
-                    onRespostaFinalizada();
-                }
+        listenerGeracao = setInterval(() => {
+            const stopBtn = document.querySelector('[data-testid="stop-button"]');
+            const sendBtn = document.querySelector('[data-testid="send-button"]');
+
+            let estado = stopBtn ? "gerando" : "idle";
+
+            if (ultimoEstado === "gerando" && estado === "idle") {
+                console.log("TRANSIÇÃO: FINALIZOU");
+                onRespostaFinalizada();
             }
+
+            ultimoEstado = estado;
+
+            //console.log(`Estado atual: ${estado}`);
         }, 800);
     }
 
