@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT Web Extras
 // @namespace    https://github.com/dionesrosa
-// @version      0.1.1
-// @description  Ajustes especificos para o ChatGPT Web, como reprodução de mensagens de voz e outras funcionalidades extras.
+// @version      0.2.1
+// @description  Reprodução automática de voz ao finalizar resposta no chat do chatGPT.
 // @author       Diones Souza
 // @license      MIT
 // @icon         https://chatgpt.com/favicon.ico
@@ -12,100 +12,197 @@
 // @downloadURL  https://raw.githubusercontent.com/dionesrosa/ChatGPT-Web-Extras/master/script.js
 // @match        *://chatgpt.com/*
 // @run-at       document-idle
-// @grant        GM_addStyle
-// @noframes
-// @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @connect      localhost
+// @noframes
 // ==/UserScript==
 
-(function () {
+(function() {
     'use strict';
 
-    let statusSistema = true;
-    let statusGerando = false;
-    let statusLeitura = false;
-    let ultimoEstado = null;
+    // ============================
+    //  Configurações do script
+    // ============================
+    const SCRIPT_NAME    = 'ChatGPT Web Extras';
+    const SCRIPT_VERSION = '0.2.1';
 
-    console.log('ChatGPT Web Extras carregado!');
+    // ============================
+    //  Estado interno
+    // ============================
+    let isReading = false;          // Indica se a leitura está em andamento (evita disparos repetidos)
+    let lastState = null;           // Último estado observado ('gerando' ou 'idle')
+    let monitorInterval = null;     // Referência ao setInterval do monitor
+    let resetTimeout = null;        // Timeout de segurança para desbloquear isReading
 
-    function onRespostaFinalizada() {
-        if (statusLeitura) return;
-
-        statusLeitura = true;
-
-        setTimeout(() => {
-            abrirMenuUltimaMensagem();
-        }, 400);
+    // ============================
+    //  Funções auxiliares de log
+    // ============================
+    function logInfo(...args) {
+        console.log(`[${SCRIPT_NAME} v${SCRIPT_VERSION}]`, ...args);
+    }
+    function logWarn(...args) {
+        console.warn(`[${SCRIPT_NAME} v${SCRIPT_VERSION}]`, ...args);
     }
 
-    function abrirMenuUltimaMensagem() {
-        const botoes = document.querySelectorAll('button[aria-label="Mais ações"]');
-        const ultimaMensagem = document.querySelectorAll('[data-message-author-role="assistant"]');
-        const ultima = ultimaMensagem[ultimaMensagem.length - 1];
+    // ============================
+    //  Gerenciamento do bloqueio (isReading)
+    // ============================
 
-        const btn = ultima?.querySelector('button[aria-label="Mais ações"]')
-            || botoes[botoes.length - 1];
-
-        if (!btn) {
-            statusLeitura = false;
-            return;
-        }
-
-        btn.click();
-
-        setTimeout(() => {
-            clicarLeitura();
-        }, 400);
+    /** Reseta o bloqueio de forma segura (limpa timeout e libera a flag) */
+    function resetReadingLock() {
+        clearTimeout(resetTimeout);
+        isReading = false;
     }
 
-    function clicarLeitura() {
-        const btnPlay = document.querySelector('[data-testid="voice-play-turn-action-button"]');
+    /**
+     * Agenda um timeout de segurança para desbloquear isReading
+     * @param {number} ms - tempo em milissegundos (padrão 15000)
+     */
+    function scheduleSafetyReset(ms = 15000) {
+        resetTimeout = setTimeout(() => {
+            logWarn('Timeout de segurança – resetando isReading');
+            resetReadingLock();
+        }, ms);
+    }
 
-        if (!btnPlay) {
-            statusLeitura = false;
+    // ============================
+    //  Lógica principal de interação com a UI
+    // ============================
+
+    /** Chamado quando a resposta termina de ser gerada */
+    function onResponseFinished() {
+        if (isReading) return;              // já está processando
+        isReading = true;
+        scheduleSafetyReset(15000);         // trava por até 15s, caso algo falhe
+
+        // Pequena pausa para garantir que o menu de ações esteja disponível
+        setTimeout(() => openLastMessageMenu(), 400);
+    }
+
+    /** Abre o menu de "Mais ações" da última mensagem do assistente */
+    function openLastMessageMenu() {
+        // Localiza todas as mensagens do assistente
+        const assistantMessages = document.querySelectorAll('[data-message-author-role="assistant"]');
+        const lastMessage = assistantMessages[assistantMessages.length - 1];
+
+        // Tenta obter o botão "Mais ações" dentro da última mensagem
+        let moreActionsBtn = lastMessage?.querySelector('button[aria-label="Mais ações"]');
+        // Fallback: se não encontrou, pega o último botão "Mais ações" da página
+        if (!moreActionsBtn) {
+            const allButtons = document.querySelectorAll('button[aria-label="Mais ações"]');
+            moreActionsBtn = allButtons[allButtons.length - 1];
+        }
+
+        if (!moreActionsBtn) {
+            logWarn('Nenhum botão "Mais ações" encontrado');
+            resetReadingLock();
             return;
         }
 
-        const estado = btnPlay.textContent?.trim();
+        // Abre o menu
+        moreActionsBtn.click();
 
-        // Se já estiver tocando
-        if (estado === "Parar") {
-            btnPlay.click();
+        // Aguarda o botão de leitura aparecer no menu (com tentativas)
+        const attemptToFindPlayButton = (retries = 0) => {
+            const playBtn = document.querySelector('[data-testid="voice-play-turn-action-button"]');
+            if (playBtn) {
+                clickPlayButton();
+            } else if (retries < 5) {
+                setTimeout(() => attemptToFindPlayButton(retries + 1), 250);
+            } else {
+                logWarn('Botão de leitura não apareceu após abrir o menu');
+                resetReadingLock();
+            }
+        };
 
-            setTimeout(() => clicarLeitura(), 400);
+        // Espera um pouco antes de começar a procurar
+        setTimeout(() => attemptToFindPlayButton(), 300);
+    }
+
+    /** Gerencia o clique no botão de leitura, tratando o estado "Parar" */
+    function clickPlayButton() {
+        const playBtn = document.querySelector('[data-testid="voice-play-turn-action-button"]');
+        if (!playBtn) {
+            logWarn('Botão de leitura sumiu');
+            resetReadingLock();
             return;
         }
 
-        btnPlay.click();
+        const currentState = playBtn.textContent?.trim();
 
+        // Se estiver tocando ("Parar"), interrompe para poder reiniciar
+        if (currentState === 'Parar') {
+            playBtn.click(); // para a reprodução
+
+            // Aguarda a transição e tenta novamente (máximo 2 tentativas)
+            setTimeout(() => {
+                const btnAfterStop = document.querySelector('[data-testid="voice-play-turn-action-button"]');
+                if (btnAfterStop && btnAfterStop.textContent?.trim() !== 'Parar') {
+                    startReading(btnAfterStop);
+                } else {
+                    // Segunda tentativa
+                    setTimeout(() => {
+                        const btnAfterSecond = document.querySelector('[data-testid="voice-play-turn-action-button"]');
+                        if (btnAfterSecond && btnAfterSecond.textContent?.trim() !== 'Parar') {
+                            startReading(btnAfterSecond);
+                        } else {
+                            logWarn('Não foi possível iniciar leitura após parar');
+                            resetReadingLock();
+                        }
+                    }, 500);
+                }
+            }, 500);
+            return;
+        }
+
+        // Estado já pronto para tocar
+        startReading(playBtn);
+    }
+
+    /** Executa o clique no botão de leitura e foca no campo de texto */
+    function startReading(button) {
+        button.click();
         setTimeout(() => {
             document.querySelector('#prompt-textarea')?.focus();
         }, 500);
-
-        statusLeitura = false;
+        resetReadingLock(); // libera o bloqueio após iniciar
     }
 
-    function initialize() {
-        if (!statusSistema) return;
+    // ============================
+    //  Monitoramento do estado de geração
+    // ============================
 
-        setInterval(() => {
-            const stopBtn = document.querySelector('[data-testid="stop-button"]');
-            const estado = stopBtn ? "gerando" : "idle";
+    /** Verifica se a resposta terminou de ser gerada */
+    function checkGenerationState() {
+        const stopButton = document.querySelector('[data-testid="stop-button"]');
+        const currentState = stopButton ? 'gerando' : 'idle';
 
-            if (ultimoEstado === "gerando" && estado === "idle") {
-                console.log("TRANSIÇÃO: FINALIZOU");
-                onRespostaFinalizada();
-            }
+        // Se mudou de 'gerando' para 'idle', a resposta finalizou
+        if (lastState === 'gerando' && currentState === 'idle') {
+            logInfo('Resposta finalizada – iniciando reprodução automática');
+            onResponseFinished();
+        }
 
-            ultimoEstado = estado;
-        }, 700);
+        lastState = currentState;
     }
 
+    /** Inicia o monitoramento periódico do estado */
+    function startMonitoring() {
+        if (monitorInterval) return; // evita múltiplos intervalos
+        monitorInterval = setInterval(checkGenerationState, 700);
+        logInfo('Monitoramento iniciado');
+    }
+
+    // ============================
+    //  Inicialização
+    // ============================
+
+    // Garante que o monitoramento comece quando o DOM estiver pronto
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        initialize();
+        startMonitoring();
     } else {
-        window.addEventListener('DOMContentLoaded', initialize);
+        window.addEventListener('DOMContentLoaded', startMonitoring);
     }
+
+    logInfo('Script carregado');
 })();
