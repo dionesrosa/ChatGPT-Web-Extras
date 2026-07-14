@@ -1,7 +1,4 @@
-(function() {
-    'use strict';
-
-    // ============================
+// ============================
     //  Configurações do script
     // ============================
     const SCRIPT_NAME    = 'ChatGPT Plus';
@@ -186,4 +183,3 @@
     }
 
     logInfo('Script carregado');
-})();
