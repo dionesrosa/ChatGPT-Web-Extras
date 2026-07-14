@@ -1,58 +1,53 @@
-# ChatGPT Web Extras 🎧
+# ChatGPT Web Extras
 
-Extensão userscript para o ChatGPT que adiciona reprodução automática de voz ao finalizar cada resposta do assistente.
+Userscript para o ChatGPT desenvolvido por Diones Souza com Tampermonkey.
 
-Sempre que o ChatGPT termina de gerar uma mensagem, o script detecta o fim da resposta e automaticamente ativa a leitura em voz alta da última mensagem.
+[![Licença MIT](https://img.shields.io/badge/licença-MIT-green)](LICENSE)
+[![Tampermonkey](https://img.shields.io/badge/Tampermonkey-suportado-orange)](https://www.tampermonkey.net/)
+
+[![Instalar](https://img.shields.io/badge/Instalar-Userscript-blue?style=for-the-badge&logo=Tampermonkey)](https://raw.githubusercontent.com/dionesrosa/ChatGPT-Web-Extras/main/dist/chatgpt-web-extras.user.js)
 
 ---
 
-## 🚀 Funcionalidades
+## ✨ O que o script faz
 
-- Detecta automaticamente quando o ChatGPT termina de gerar uma resposta
+Este userscript detecta automaticamente o fim da geração de uma resposta no ChatGPT e inicia a reprodução de voz da última mensagem.
+
+## 🔧 Funcionalidades
+
+- Detecta o fim da resposta do assistente
 - Abre o menu de ações da última mensagem
-- Ativa a reprodução de voz automaticamente
-- Evita múltiplos disparos com controle de estado interno
-- Sistema de fallback para garantir funcionamento mesmo com atrasos da interface
-- Proteção contra loops e falhas com timeout de segurança
+- Inicia a reprodução automática de voz
+- Evita disparos duplicados com controle de estado interno
+- Usa fallback para lidar com atrasos da interface
 
----
+## 🚀 Instalação
 
-## ⚙️ Como funciona
+1. Instale a extensão [Tampermonkey](https://www.tampermonkey.net/) no navegador.
+2. Instale o userscript disponível no link acima.
+3. Acesse o ChatGPT normalmente.
 
-O script monitora a interface do ChatGPT em tempo real.  
-Quando o botão de "parar geração" desaparece, ele entende que a resposta terminou e executa automaticamente:
+## 🖱️ Como usar
 
-1. Abre o menu de ações da última mensagem
-2. Localiza o botão de leitura em voz alta
-3. Inicia a reprodução automaticamente
-4. Foca de volta no campo de texto
+O script funciona automaticamente quando a resposta terminar de ser gerada. Não é necessário configurar nada manualmente.
 
----
+## 🛠️ Compilação com userscript-builder
 
-## 🧠 Tecnologias
+Para gerar o arquivo final localmente:
 
-- JavaScript puro
-- Tampermonkey / Userscript API
-- Mutation + DOM polling (monitoramento leve da UI)
+```bash
+usb build
+```
 
----
+## 🧩 Estrutura do projeto
 
-## 📦 Instalação
+- [script.js](script.js): lógica principal do userscript
+- [userscript.config.json](userscript.config.json): metadados e configuração do build
 
-1. Instale uma extensão userscript (ex: Tampermonkey)
-2. Adicione o script `script.js`
-3. Acesse o ChatGPT normalmente
+## 👤 Autor
 
----
+Diones Souza
 
-## 📌 Compatibilidade
-
-- ChatGPT Web (https://chatgpt.com)
-- Interface atual baseada em mensagens com `data-message-author-role`
-
-
----
-
-## 📄 Licença
+## 📜 Licença
 
 MIT
